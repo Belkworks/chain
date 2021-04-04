@@ -23,7 +23,6 @@ class Chain
         assert step, 'chain: cannot run an empty chain!'
 
         i = 1
-        runNext = nil
 
         next = (value) ->
             assert value == nil, 'chain: threw ' .. tostring value
@@ -32,10 +31,8 @@ class Chain
             step = @middleware[i]
 
             if step
-                runNext!
+                step next, Payload
             elseif Callback
                 Callback Payload
 
-        runNext = -> step next, Payload
-
-        runNext!
+        step next, Payload
