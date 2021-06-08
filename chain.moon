@@ -2,37 +2,39 @@
 -- SFZILabs 2021
 
 class Chain
-    new: =>
-        @middleware = {} -- {fn, fn, fn}
+	new: =>
+		@Callbacks = {}
 
-    use: (Callback) =>
-        switch type Callback
-            when 'function'
-                table.insert @middleware, Callback
+	use: (Fn) =>
+		table.insert @Callbacks, Fn
 
-            when 'table'
-                if Callback.run
-                    @use (next, value) -> Callback\run value, -> next!
-                else error 'chain: callback table should be a chain!'
+	run: (...) =>
+		I = 0
+		Args = { ... }
+		next = ->
+			I += 1
+			if Fn = @Callbacks[I]
+				F = I
+				Fn (unpack Args), (E) ->
+					if F == I
+						F = nil
+						assert E == nil, E
+						next!
+		next!
 
-            else
-                error 'chain: use expects a callback!'
+	@Thru: (Fn) ->
+		(...) ->
+			Args = { ... }
+			Next = table.remove Args
+			Fn unpack Args
+			Next!
 
-    run: (Payload, Callback) =>
-        step = @middleware[1]
-        assert step, 'chain: cannot run an empty chain!'
+	@Compose: (...) ->
+		C = with Easy.Chain!
+			\use F for F in *{...}
 
-        i = 1
-
-        next = (value) ->
-            assert value == nil, 'chain: threw ' .. tostring value
-
-            i += 1
-            step = @middleware[i]
-
-            if step
-                step next, Payload
-            elseif Callback
-                Callback Payload
-
-        step next, Payload
+		(...) ->
+			Args = { ... }
+			Next = table.remove Args
+			C\use -> Next!
+			C\run unpack Args

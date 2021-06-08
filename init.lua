@@ -2,46 +2,38 @@ local Chain
 do
   local _class_0
   local _base_0 = {
-    use = function(self, Callback)
-      local _exp_0 = type(Callback)
-      if 'function' == _exp_0 then
-        return table.insert(self.middleware, Callback)
-      elseif 'table' == _exp_0 then
-        if Callback.run then
-          return self:use(function(next, value)
-            return Callback:run(value, function()
-              return next()
-            end)
-          end)
-        else
-          return error('chain: callback table should be a chain!')
-        end
-      else
-        return error('chain: use expects a callback!')
-      end
+    use = function(self, Fn)
+      return table.insert(self.Callbacks, Fn)
     end,
-    run = function(self, Payload, Callback)
-      local step = self.middleware[1]
-      assert(step, 'chain: cannot run an empty chain!')
-      local i = 1
+    run = function(self, ...)
+      local I = 0
+      local Args = {
+        ...
+      }
       local next
-      next = function(value)
-        assert(value == nil, 'chain: threw ' .. tostring(value))
-        i = i + 1
-        step = self.middleware[i]
-        if step then
-          return step(next, Payload)
-        elseif Callback then
-          return Callback(Payload)
+      next = function()
+        I = I + 1
+        do
+          local Fn = self.Callbacks[I]
+          if Fn then
+            local F = I
+            return Fn((unpack(Args)), function(E)
+              if F == I then
+                F = nil
+                assert(E == nil, E)
+                return next()
+              end
+            end)
+          end
         end
       end
-      return step(next, Payload)
+      return next()
     end
   }
   _base_0.__index = _base_0
   _class_0 = setmetatable({
     __init = function(self)
-      self.middleware = { }
+      self.Callbacks = { }
     end,
     __base = _base_0,
     __name = "Chain"
@@ -54,6 +46,41 @@ do
     end
   })
   _base_0.__class = _class_0
+  local self = _class_0
+  self.Thru = function(Fn)
+    return function(...)
+      local Args = {
+        ...
+      }
+      local Next = table.remove(Args)
+      Fn(unpack(Args))
+      return Next()
+    end
+  end
+  self.Compose = function(...)
+    local C
+    do
+      local _with_0 = Easy.Chain()
+      local _list_0 = {
+        ...
+      }
+      for _index_0 = 1, #_list_0 do
+        local F = _list_0[_index_0]
+        _with_0:use(F)
+      end
+      C = _with_0
+    end
+    return function(...)
+      local Args = {
+        ...
+      }
+      local Next = table.remove(Args)
+      C:use(function()
+        return Next()
+      end)
+      return C:run(unpack(Args))
+    end
+  end
   Chain = _class_0
   return _class_0
 end
