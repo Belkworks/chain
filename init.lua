@@ -1,9 +1,35 @@
+local matcher
+matcher = function(T)
+  return function(next, skip, payload)
+    if not (payload) then
+      payload = skip
+    end
+    for i, v in pairs(T) do
+      if payload[i] ~= v then
+        if skip then
+          return skip()
+        end
+      end
+    end
+    return next()
+  end
+end
 local Chain
 do
   local _class_0
   local _base_0 = {
-    use = function(self, Fn)
-      return table.insert(self.Callbacks, Fn)
+    use = function(self, ...)
+      local Args = {
+        ...
+      }
+      assert(Args[1], 'chain: use expects a callback!')
+      return table.insert(self.Callbacks, (function(...)
+        if #Args == 1 then
+          return Args[1]
+        else
+          return Chain.Compose(...)
+        end
+      end)(...))
     end,
     run = function(self, ...)
       local I = 0
@@ -17,13 +43,18 @@ do
           local Fn = self.Callbacks[I]
           if Fn then
             local F = I
-            return Fn((unpack(Args)), function(E)
+            if 'table' == type(Fn) then
+              Fn = matcher(Fn)
+            end
+            local callback
+            callback = function(E)
               if F == I then
                 F = nil
                 assert(E == nil, E)
                 return next()
               end
-            end)
+            end
+            return Fn(callback, unpack(Args))
           end
         end
       end
@@ -52,7 +83,7 @@ do
       local Args = {
         ...
       }
-      local Next = table.remove(Args)
+      local Next = table.remove(Args, 1)
       Fn(unpack(Args))
       return Next()
     end
@@ -60,7 +91,7 @@ do
   self.Compose = function(...)
     local C
     do
-      local _with_0 = Easy.Chain()
+      local _with_0 = Chain()
       local _list_0 = {
         ...
       }
@@ -74,11 +105,11 @@ do
       local Args = {
         ...
       }
-      local Next = table.remove(Args)
+      local Next = table.remove(Args, 1)
       C:use(function()
         return Next()
       end)
-      return C:run(unpack(Args))
+      return C:run(Next, unpack(Args))
     end
   end
   Chain = _class_0
